@@ -1,5 +1,9 @@
 package axmlParser
 
+import (
+	"github.com/go-xweb/log"
+)
+
 type AppNameListener struct {
 	PackageName      string
 	VersionName      string
@@ -75,6 +79,10 @@ func (listener *AppNameListener) StartElement(uri, localName, qName string,
 				listener.VersionCode = attr.Value
 				break
 			case "versionName":
+				listener.VersionName = attr.Value
+				break
+			case "": // hack
+				log.Warn("STR", "Found empty attribute, assuming VersionName")
 				listener.VersionName = attr.Value
 				break
 			}
