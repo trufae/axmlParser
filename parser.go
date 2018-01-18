@@ -54,6 +54,7 @@ type Parser struct {
 
 	StringsTable                        []string
 	ResourcesIds                        []int
+	Flags                               uint32
 	StringsCount, StylesCount, ResCount int
 	ParserOffset                        int
 }
@@ -132,17 +133,30 @@ func (parser *Parser) parseStartDocument() {
  * <li>6th word : Offset to style data</li>
  * </ul>
  */
+
+/*
+ Flags.
+        enum {
+            // If set, the string index is sorted by the string values (based
+            // on strcmp16()).
+            SORTED_FLAG = 1<<0,
+
+            // String pool is encoded in UTF-8
+            UTF8_FLAG = 1<<8
+        };
+*/
 func (parser *Parser) parseStringTable() {
 	chunk := parser.getLEWord(parser.ParserOffset + (1 * WORD_SIZE))
 	parser.StringsCount = parser.getLEWord(parser.ParserOffset + (2 * WORD_SIZE))
 	parser.StylesCount = parser.getLEWord(parser.ParserOffset + (3 * WORD_SIZE))
+	parser.Flags = uint32(parser.getLEWord(parser.ParserOffset + (4 * WORD_SIZE)))
 	strOffset := parser.ParserOffset + parser.getLEWord(parser.ParserOffset+(5*WORD_SIZE))
 	styleOffset := parser.getLEWord(parser.ParserOffset + (6 * WORD_SIZE))
 
 	parser.StringsTable = make([]string, parser.StringsCount)
-	var offset int
+	var offset uint32
 	for i := 0; i < int(parser.StringsCount); i++ {
-		offset = strOffset + parser.getLEWord(parser.ParserOffset+((i+7)*WORD_SIZE))
+		offset = uint32(strOffset + parser.getLEWord(parser.ParserOffset+((i+7)*WORD_SIZE)))
 		parser.StringsTable[i] = parser.getStringFromStringTable(offset)
 	}
 
@@ -211,13 +225,13 @@ func (parser *Parser) parseNamespace(start bool) {
  * <li>0th word : 0x00100102 = Start_Tag</li>
  * <li>1st word : chunk size</li>
  * <li>2nd word : line this tag appeared in the original file</li>
- * <li>3rd word : ??? (always 0xFFFFFF)</li>
+ * <li>3rd word : optional xml comment for element (always 0xFFFFFF)</li>
  * <li>4th word : index of namespace uri in StringIndexTable, or 0xFFFFFFFF
  * for default NS</li>
  * <li>5th word : index of element name in StringIndexTable</li>
- * <li>6th word : ???</li>
+ * <li>6th word : size of attribute structures to follow</li>
  * <li>7th word : number of attributes following the start tag</li>
- * <li>8th word : ??? (0)</li>
+ * <li>8th word : index of id attribute (0 if none)</li>
  * </ul>
  *
  */
@@ -225,7 +239,9 @@ func (parser *Parser) parseStartTag() {
 	// get tag info
 	uriIdx := parser.getLEWord(parser.ParserOffset + (4 * WORD_SIZE))
 	nameIdx := parser.getLEWord(parser.ParserOffset + (5 * WORD_SIZE))
+	//	attrSize := parser.getLEWord(parser.ParserOffset + (6 * WORD_SIZE))
 	attrCount := parser.getLEWord(parser.ParserOffset + (7 * WORD_SIZE))
+	//	attrIdx := parser.getLEWord(parser.ParserOffset + (8 * WORD_SIZE));
 
 	name := parser.getString(nameIdx)
 	var uri, qname string
@@ -359,6 +375,7 @@ func (parser *Parser) parseEndTag() {
  */
 func (parser *Parser) getString(index int) string {
 	var res string
+
 	if (index >= 0) && (index < parser.StringsCount) {
 		res = parser.StringsTable[index]
 	} else {
@@ -374,21 +391,21 @@ func (parser *Parser) getString(index int) string {
  *            (and not the whole data array)
  * @return the String
  */
-func (parser *Parser) getStringFromStringTable(offset int) string {
+func (parser *Parser) getStringFromStringTable(offset uint32) string {
 	var strLength int
 	var chars []byte
-	if parser.Data[offset+1] == parser.Data[offset] {
+	if parser.Data[offset] == parser.Data[offset+1] {
 		strLength = int(parser.Data[offset])
+		// strLength = ((int(parser.Data[offset+1]) << 8) & 0xFF00) | (int(parser.Data[offset]) & 0xFF)
 		chars = make([]byte, strLength) // NOPMD
 		for i := 0; i < strLength; i++ {
-			chars[i] = parser.Data[offset+2+i] // NOPMD
+			chars[i] = parser.Data[offset+2+uint32(i)] // NOPMD
 		}
 	} else {
-		strLength = ((int(parser.Data[offset+1] << 8)) & 0xFF00) |
-			(int(parser.Data[offset]) & 0xFF)
+		strLength = ((int(parser.Data[offset+1]) << 8) & 0xFF00) | (int(parser.Data[offset]) & 0xFF)
 		chars = make([]byte, strLength) // NOPMD
 		for i := 0; i < strLength; i++ {
-			chars[i] = parser.Data[offset+2+(i*2)] // NOPMD
+			chars[i] = parser.Data[offset+2+(uint32(i)*2)] // NOPMD
 		}
 	}
 	return string(chars)
