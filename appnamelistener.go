@@ -2,13 +2,16 @@ package axmlParser
 
 import (
 	"github.com/go-xweb/log"
+	"fmt"
 )
 
 type AppNameListener struct {
+	AppName          string
 	PackageName      string
 	VersionName      string
 	VersionCode      string
 	ActivityName     string
+	MinOsVersion     string
 	tempActivityName string
 	findMainActivity bool
 }
@@ -66,12 +69,15 @@ func (listener *AppNameListener) EndPrefixMapping(prefix, uri string) {}
 func (listener *AppNameListener) StartElement(uri, localName, qName string,
 	attrs []*Attribute) {
 	if listener.findMainActivity {
-		return
+		// return
 	}
 
 	if localName == "manifest" {
 		for _, attr := range attrs {
 			switch attr.Name {
+			case "platformBuildVersionName":
+				listener.MinOsVersion = attr.Value
+				break
 			case "package":
 				listener.PackageName = attr.Value
 				break
@@ -92,6 +98,15 @@ func (listener *AppNameListener) StartElement(uri, localName, qName string,
 
 	if localName == "activity" {
 		for _, attr := range attrs {
+/*
+fmt.Println("ACTIVITY")
+fmt.Println("====")
+fmt.Println(attr.Namespace)
+fmt.Println(attr.Name)
+fmt.Println(attr.Prefix)
+fmt.Println(attr.Value)
+fmt.Println("====")
+*/
 			if attr.Name == "name" && attr.Prefix == "android" &&
 				attr.Namespace == "http://schemas.android.com/apk/res/android" {
 				listener.tempActivityName = attr.Value
