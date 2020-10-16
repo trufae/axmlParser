@@ -2,7 +2,6 @@ package axmlParser
 
 import (
 	"github.com/go-xweb/log"
-	"fmt"
 )
 
 type AppNameListener struct {
